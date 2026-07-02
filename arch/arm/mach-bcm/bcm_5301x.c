@@ -28,10 +28,24 @@ static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
 	 * The biggest disadvantage is the same FSR code may be reported when
 	 * reading non-existing APB register and we shouldn't ignore that.
 	 */
-	if (fsr == (FSR_EXTERNAL | FSR_READ | FSR_IMPRECISE))
+	pr_info("bcm5301x_abort_handler();\n");
+	if ((fsr == (FSR_EXTERNAL | FSR_READ | FSR_IMPRECISE)) ||
+		((fsr & 0x1c0f) == 0x1c06)) {
+		pr_info("Hit an abort we don't want to handle!\n");
+		pr_info(" >> fsr = 0x%x\n", fsr);
+		pr_info(" >> fsr & 0x1c0f = 0x%x\n", fsr & 0x1c0f);
 		return 0;
-
+	}
+	pr_info("Hit an abort, but we didn't ignore it! Maddness awaits!\n");
 	return 1;
+}
+
+static void __init bcm5301x_map_io(void)
+{
+	pr_info("bcm5301x_map_io();\n");
+    hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
+        "imprecise external abort");
+	pr_info("bcm5301x_map_io(); done!\n");
 }
 
 static void __init bcm5301x_init_early(void)
@@ -43,6 +57,7 @@ static void __init bcm5301x_init_early(void)
 DT_MACHINE_START(BCM5301X, "BCM5301X")
 	.l2c_aux_val	= 0,
 	.l2c_aux_mask	= ~0,
+	.map_io		= bcm5301x_map_io,
 	.dt_compat	= bcm5301x_dt_compat,
 	.init_early	= bcm5301x_init_early,
 MACHINE_END

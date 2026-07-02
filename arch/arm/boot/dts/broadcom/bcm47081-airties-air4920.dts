@@ -1,0 +1,138 @@
+/dts-v1/;
+
+#include "bcm47081.dtsi"
+
+/ {
+    compatible = "airties,air4920", "brcm,bcm47081", "brcm,bcm4708";
+    model = "AirTies Air4920 (BCM47081)";
+
+    chosen {
+        /* bootargs = "console=ttyS0,115200 earlycon earlyprintk loglevel=7 debug rdinit=/sbin/init"; */
+        bootargs = "ubi.mtd=7,2048 root=ubi0:rootfs rootfstype=ubifs console=ttyS0,115200 mtdparts=air-nand:0x80000@0x0(boot),0x200000@0x80000(nvram),0x100000@0x280000(Config),0x100000@0x380000(ASD),0x600000@0x480000(Kernel),0x3400000@0xa80000(RootFS),0x600000@0x3e80000(kernelalt),0x3400000@0x4480000(rootfsalt),0x3400000@0x4480000(disk),0x280000@0x7c80000(edr),0x100000@0x7f00000(bbt),0x8000000@0x0(FlashAll) init=/sbin/init debug loglevel=7 panic=0";
+    };
+
+    memory@0 {
+        device_type = "memory";
+        reg = <0x00000000 0x08000000>;
+    };
+
+};
+
+&nand_controller {
+    status = "okay";
+    /* see: bcm5301x-nand-cs0-bch8.dtsi */
+    nandcs: nand@0 {
+        compatible = "brcm,nandcs";
+        reg = <0>;
+        nand-ecc-algo = "bch";
+        nand-ecc-strength = <8>;
+        nand-ecc-step-size = <512>;
+
+        partitions {
+            /* compatible = "brcm,bcm947xx-cfe-partitions"; */
+            compatible = "fixed-partitions";
+            #address-cells = <1>;
+            #size-cells = <1>;
+            /*
+             * BEFORE BOOTING THIS!!!!!!!
+             * BE SURE TO CHECK YOUR PARTITION LAYOUT MATCHES.
+             * THIS IS HARDCODED TO WHAT WAS ON MY MODEL.
+             *
+             * IF THIS IS MATCHED TO SOFTWARE VERSION NUMBERS, THIS IS FOR 1.33.10.2.1388
+             * DOUBLE CHECK BEFORE BOOTING OR THINGS COULD GO AWRY!
+             *
+             */
+
+            partition@0 {
+                label = "boot";
+                reg = <0x00000000 0x00080000>;
+                read-only;
+            };
+
+            partition@80000 {
+                label = "nvram";
+                reg = <0x00080000 0x00200000>;
+                read-only;
+            };
+
+            partition@280000 {
+                label = "Config";
+                reg = <0x00280000 0x00100000>;
+                read-only;
+            };
+
+            partition@380000 {
+                /* autism spectrum disorder partition */
+                label = "ASD";
+                reg = <0x00380000 0x00100000>;
+                read-only;
+            };
+
+            partition@480000 {
+                label = "Kernel";
+                reg = <0x00480000 0x00600000>;
+                read-only;
+            };
+
+            partition@a80000 {
+                label = "RootFS";
+                reg = <0x00a80000 0x03400000>;
+                read-only;
+            };
+
+            partition@3e80000 {
+                label = "kernelalt";
+                reg = <0x03e80000 0x00600000>;
+                /* read-only; */
+            };
+
+            partition@4480000 {
+                label = "rootfsalt";
+                reg = <0x04480000 0x03400000>;
+                read-only;
+            };
+
+            partition@4480000_1 {
+                /* No clue what this is used for, but here it is */
+                label = "disk";
+                reg = <0x04480000 0x03400000>;
+                read-only;
+            };
+
+            partition@7c80000 {
+                label = "edr";
+                reg = <0x07c80000 0x00280000>;
+                read-only;
+            };
+
+            partition@7f00000 {
+                label = "bbt";
+                reg = <0x07f00000 0x00100000>;
+                read-only;
+            };
+
+            partition@0_1 {
+                /* One big partition with ALL the nand storage. Use this with caution! */
+                label = "FlashAll";
+                reg = <0x0 0x8000000>;
+                read-only;
+            };
+        };
+    };
+};
+
+/* Disable PCIe, To prevent this:
+ * [    5.822300] Unhandled fault: external abort on non-linefetch (0x1008) at 0xc904ff40
+ */
+
+&pcie0 {
+    status = "disabled";
+};
+
+&pcie1 {
+    status = "disabled";
+};
+
+&pcie2 {
+    status = "disabled";
+};
