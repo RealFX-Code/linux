@@ -33,6 +33,7 @@ struct exynos_pmu_context {
 	const struct exynos_pmu_data *pmu_data;
 	struct regmap *pmureg;
 	struct regmap *pmuintrgen;
+	void *d1reg;
 	/*
 	 * Serialization lock for CPU hot plug and cpuidle ACPM hint
 	 * programming. Also protects in_cpuhp, sys_insuspend & sys_inreboot
