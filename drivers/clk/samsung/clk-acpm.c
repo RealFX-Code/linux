@@ -73,7 +73,8 @@ static const struct acpm_clk_variant exynos9820_acpm_clks[] = {
 	ACPM_CLK("disp"),
 	ACPM_CLK("score"),
 	ACPM_CLK("aud"),
-	ACPM_CLK("gpu"),
+	ACPM_CLK("cp"),		/* Not a clock? */
+	ACPM_CLK("g3d"),
 	ACPM_CLK("intcam"),
 	ACPM_CLK("cam"),
 	ACPM_CLK("iva"),
@@ -83,16 +84,20 @@ static const struct acpm_clk_variant exynos9820_acpm_clks[] = {
 static const struct acpm_clk_driver_data acpm_clk_exynos9820 = {
 	.clks = exynos9820_acpm_clks,
 	.nr_clks = ARRAY_SIZE(exynos9820_acpm_clks),
-	.mbox_chan_id = 5,
+	.mbox_chan_id = 0,
 };
 
 static unsigned long acpm_clk_recalc_rate(struct clk_hw *hw,
 					  unsigned long parent_rate)
 {
 	struct acpm_clk *clk = to_acpm_clk(hw);
+	unsigned long ret;
 
-	return clk->handle->ops->dvfs.get_rate(clk->handle, clk->mbox_chan_id,
+	pr_err("%s clk->id=%u parent_rate=%lu\n", __func__, clk->id, parent_rate);
+
+	ret = clk->handle->ops->dvfs.get_rate(clk->handle, clk->mbox_chan_id,
 					       clk->id);
+	return ret ?: 1000;
 }
 
 static int acpm_clk_determine_rate(struct clk_hw *hw,
@@ -104,6 +109,8 @@ static int acpm_clk_determine_rate(struct clk_hw *hw,
 	 * after the rate is set and we'll know what rate the clock is
 	 * running at then.
 	 */
+	struct acpm_clk *clk = to_acpm_clk(hw);
+	pr_err("%s clk->id=%u\n", __func__, clk->id);
 	return 0;
 }
 
@@ -111,6 +118,8 @@ static int acpm_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 			     unsigned long parent_rate)
 {
 	struct acpm_clk *clk = to_acpm_clk(hw);
+
+	pr_err("%s clk->id=%u rate=%lu parent_rate=%lu\n", __func__, clk->id, rate, parent_rate);
 
 	return clk->handle->ops->dvfs.set_rate(clk->handle, clk->mbox_chan_id,
 					       clk->id, rate);
