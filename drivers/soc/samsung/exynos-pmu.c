@@ -15,10 +15,10 @@
 #include <linux/mfd/syscon.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/regmap.h>
- #include <linux/debugfs.h>
 
 #include <linux/soc/samsung/exynos-regs-pmu.h>
 #include <linux/soc/samsung/exynos-pmu.h>
@@ -216,39 +216,10 @@ struct regmap *exynos_get_pmu_regmap_by_phandle(struct device_node *np,
 }
 EXPORT_SYMBOL_GPL(exynos_get_pmu_regmap_by_phandle);
 
-
-#define RESET_SEQUENCER_CONFIGURATION		(0x0500)
-#define DFD_EDPCSR_DUMP_EN			(1 << 0)
-#define RESET_DISABLE_GPR_CPUPORESET		(1 << 15)
-#define RESET_DISABLE_WDT_CORERESET		(1 << 13)
-#define RESET_DISABLE_WDT_CPUPORESET		(1 << 12)
-#define RESET_DISABLE_CORERESET			(1 << 9)
-#define RESET_DISABLE_CPUPORESET		(1 << 8)
-#define RESET_DISABLE_WDT_PRESET_DBG		(1 << 26)
-#define RESET_DISABLE_PRESET_DBG		(1 << 18)
-#define RESET_DISABLE_WDT_L2RESET		(1 << 31)
-#define DFD_DISABLE_RESET		(RESET_DISABLE_WDT_CORERESET	\
-					| RESET_DISABLE_WDT_CPUPORESET	\
-					| RESET_DISABLE_CORERESET	\
-					| RESET_DISABLE_CPUPORESET)
-#define BIG_CPU0_RESET				(0x3C0C)
-#define	PMU_CPU_OFFSET			(0x10)
-#define BIG_NONCPU_ETC_RESET			(0x3C8C)
-#define	DFD_BIG_NONCPU_ETC_RESET	(RESET_DISABLE_WDT_PRESET_DBG	\
-					| RESET_DISABLE_PRESET_DBG	\
-					| RESET_DISABLE_WDT_L2RESET)
-#define CPU_RESET_DISABLE_FROM_SOFTRESET	(0x041C)
-#define CPU_RESET_DISABLE_FROM_WDTRESET		(0x0414)
-#define DEFAULT_VAL_CPU_RESET_DISABLE		(0xFFFFFFFC)
-#define PEND_BIG				(1 << 1)
-#define PEND_LITTLE				(1 << 0)
-#define DFD_RESET_PEND			(PEND_BIG | PEND_LITTLE)
-
 /* Called from CPU PM notifier (CPUIdle code path) with IRQs disabled */
 static int exynos_cpu_pmu_online(void)
 {
-	u32 reg;
-	int cpu, ret;
+	int cpu;
 
 	raw_spin_lock(&pmu_context->cpupm_lock);
 
@@ -258,42 +229,10 @@ static int exynos_cpu_pmu_online(void)
 	}
 
 	cpu = smp_processor_id();
-	ret = pmu_context->pmu_data->cpu_pmu_online(pmu_context, cpu);
+	pmu_context->pmu_data->cpu_pmu_online(pmu_context, cpu);
 	raw_spin_unlock(&pmu_context->cpupm_lock);
 
-	regmap_read(pmu_context->pmureg,
-			    RESET_SEQUENCER_CONFIGURATION, &reg);
-	if (reg != 0x600) {
-		pr_err("%s RESET_SEQUENCER_CONFIGURATION=0x%x\n", __func__,
-		       reg);
-	}
-	if (reg & DFD_EDPCSR_DUMP_EN) {
-		regmap_read(pmu_context->pmureg,
-			    CPU_RESET_DISABLE_FROM_SOFTRESET, &reg);
-		if (reg != DEFAULT_VAL_CPU_RESET_DISABLE)
-			regmap_update_bits(pmu_context->pmureg,
-					   CPU_RESET_DISABLE_FROM_SOFTRESET,
-					   DFD_RESET_PEND, 0);
-
-		regmap_read(pmu_context->pmureg,
-			    CPU_RESET_DISABLE_FROM_WDTRESET, &reg);
-		if (reg != DEFAULT_VAL_CPU_RESET_DISABLE)
-			regmap_update_bits(pmu_context->pmureg,
-					   CPU_RESET_DISABLE_FROM_WDTRESET,
-					   DFD_RESET_PEND, 0);
-
-		regmap_update_bits(pmu_context->pmureg,
-				   BIG_CPU0_RESET + (0 * PMU_CPU_OFFSET),
-				   DFD_DISABLE_RESET, DFD_DISABLE_RESET);
-		regmap_update_bits(pmu_context->pmureg,
-				   BIG_CPU0_RESET + (1 * PMU_CPU_OFFSET),
-				   DFD_DISABLE_RESET, DFD_DISABLE_RESET);
-		regmap_update_bits(pmu_context->pmureg,
-				   BIG_NONCPU_ETC_RESET,
-				   DFD_BIG_NONCPU_ETC_RESET, DFD_BIG_NONCPU_ETC_RESET);
-	}
-
-	return ret ? NOTIFY_BAD : NOTIFY_OK;
+	return NOTIFY_OK;
 }
 
 /* Called from CPU hot plug callback with IRQs enabled */
@@ -315,14 +254,10 @@ static int exynos_cpuhp_pmu_online(unsigned int cpu)
 }
 
 /* Called from CPU hot plug callback with IRQs disabled */
-static int exynos_cpuhp_pmu_online1(unsigned int cpu)
+static int exynos_cpuhp_pmu_power_up(unsigned int cpu)
 {
 	raw_spin_lock(&pmu_context->cpupm_lock);
-	pr_err("%s start cpu=%u smp_id=%d\n", __func__, cpu, smp_processor_id());
-	pr_info("%s: in_cpuhp = %*pbl\n", __func__, num_possible_cpus(),
-		pmu_context->in_cpuhp);
 	pmu_context->pmu_data->cpu_pmu_online(pmu_context, cpu);
-	pr_err("%s end cpu=%u smp_id=%d\n", __func__, cpu, smp_processor_id());
 	raw_spin_unlock(&pmu_context->cpupm_lock);
 
 	return 0;
@@ -331,7 +266,6 @@ static int exynos_cpuhp_pmu_online1(unsigned int cpu)
 /* Called from CPU PM notifier (CPUIdle code path) with IRQs disabled */
 static int exynos_cpu_pmu_offline(void)
 {
-	u32 reg;
 	int cpu, ret;
 
 	raw_spin_lock(&pmu_context->cpupm_lock);
@@ -345,29 +279,11 @@ static int exynos_cpu_pmu_offline(void)
 	/* Ignore CPU_PM_ENTER event in reboot or suspend sequence. */
 	if (pmu_context->sys_insuspend || pmu_context->sys_inreboot) {
 		raw_spin_unlock(&pmu_context->cpupm_lock);
-		return NOTIFY_OK;
+		return NOTIFY_BAD;
 	}
 
 	ret = pmu_context->pmu_data->cpu_pmu_offline(pmu_context, cpu);
 	raw_spin_unlock(&pmu_context->cpupm_lock);
-
-	regmap_read(pmu_context->pmureg,
-			    RESET_SEQUENCER_CONFIGURATION, &reg);
-	if (reg != 0x600) {
-		pr_err("%s RESET_SEQUENCER_CONFIGURATION=0x%x\n", __func__,
-		       reg);
-	}
-	if (reg & DFD_EDPCSR_DUMP_EN) {
-		regmap_update_bits(pmu_context->pmureg,
-				   BIG_CPU0_RESET + (0 * PMU_CPU_OFFSET),
-				   DFD_DISABLE_RESET, 0);
-		regmap_update_bits(pmu_context->pmureg,
-				   BIG_CPU0_RESET + (1 * PMU_CPU_OFFSET),
-				   DFD_DISABLE_RESET, 0);
-		regmap_update_bits(pmu_context->pmureg,
-				   BIG_NONCPU_ETC_RESET,
-				   DFD_BIG_NONCPU_ETC_RESET, 0);
-	}
 
 	return ret ? NOTIFY_BAD : NOTIFY_OK;
 }
@@ -391,13 +307,11 @@ static int exynos_cpuhp_pmu_offline(unsigned int cpu)
 }
 
 /* Called from CPU hot plug callback with IRQs disabled */
-static int exynos_cpuhp_pmu_offline1(unsigned int cpu)
+static int exynos_cpuhp_pmu_power_down(unsigned int cpu)
 {
-	pr_err("%s start\n", __func__);
 	raw_spin_lock(&pmu_context->cpupm_lock);
 	pmu_context->pmu_data->cpu_pmu_offline(pmu_context, cpu);
 	raw_spin_unlock(&pmu_context->cpupm_lock);
-	pr_err("%s end\n", __func__);
 
 	return 0;
 }
@@ -454,6 +368,10 @@ static void destroy_cpuhp_and_cpuidle(void)
 
 	if (pmu_context->cpuhp_prepare_state != CPUHP_INVALID)
 		cpuhp_remove_state(pmu_context->cpuhp_prepare_state);
+	if (pmu_context->cpuhp_power_up != CPUHP_INVALID)
+		cpuhp_remove_state(pmu_context->cpuhp_power_up);
+	if (pmu_context->cpuhp_power_down != CPUHP_INVALID)
+		cpuhp_remove_state(pmu_context->cpuhp_power_down);
 	if (pmu_context->cpuhp_online_state != CPUHP_INVALID)
 		cpuhp_remove_state(pmu_context->cpuhp_online_state);
 }
@@ -520,13 +438,8 @@ static int setup_cpuhp_and_cpuidle(struct device *dev)
 	if (!pmu_context->in_cpuhp)
 		return -ENOMEM;
 	bitmap_set(pmu_context->in_cpuhp, 0, num_possible_cpus());
-	pr_info("pmu in_cpuhp = %*pbl\n", num_possible_cpus(),
-		pmu_context->in_cpuhp);
-	debugfs_create_ulong("exynos_pmu_in_cpuhp", 0644, NULL, pmu_context->in_cpuhp);
-
-	pmu_context->d1reg = ioremap(0x1D100000, 0x1000);
-	if (!pmu_context->d1reg)
-		return -ENOMEM;
+	debugfs_create_ulong("exynos_pmu_in_cpuhp", 0644, NULL,
+			     pmu_context->in_cpuhp);
 
 	/* set PMU to power on */
 	// for_each_online_cpu(cpu)
@@ -534,37 +447,37 @@ static int setup_cpuhp_and_cpuidle(struct device *dev)
 
 	/* register CPU hotplug callbacks */
 	pmu_context->cpuhp_prepare_state = CPUHP_INVALID;
+	pmu_context->cpuhp_power_up = CPUHP_INVALID;
+	pmu_context->cpuhp_power_down = CPUHP_INVALID;
 	pmu_context->cpuhp_online_state = CPUHP_INVALID;
 
-	// ret = cpuhp_setup_state(CPUHP_BP_PREPARE_DYN, "soc/exynos-pmu:prepare",
-	// 			exynos_cpuhp_pmu_online, NULL);
-	// if (ret < 0)
-	// 	return ret;
+	ret = cpuhp_setup_state(CPUHP_BP_PREPARE_DYN, "soc/exynos-pmu:prepare",
+				exynos_cpuhp_pmu_online, NULL);
+	if (ret < 0)
+		return ret;
 
-	// pmu_context->cpuhp_prepare_state = ret;
-	// ret = cpuhp_setup_state(CPUHP_AP_OFFLINE, "soc/exynos-pmu:offline",
-	// 			NULL, exynos_cpuhp_pmu_offline1);
-	// if (ret < 0)
-	// 	return ret;
-
-	// pmu_context->cpuhp_prepare_state = ret;
+	pmu_context->cpuhp_prepare_state = ret;
 
 	ret = cpuhp_setup_state(CPUHP_AP_EXYNOS_CPU_POWER_UP, "soc/exynos-pmu:power_up",
-				exynos_cpuhp_pmu_online1, NULL);
+				exynos_cpuhp_pmu_power_up, NULL);
 	if (ret < 0)
-		return ret;
+		goto clean_cpuhp_states;
+
+	pmu_context->cpuhp_power_up = ret;
 
 	ret = cpuhp_setup_state(CPUHP_AP_EXYNOS_CPU_POWER_DOWN, "soc/exynos-pmu:power_down",
-				NULL, exynos_cpuhp_pmu_offline1);
+				NULL, exynos_cpuhp_pmu_power_down);
 	if (ret < 0)
-		return ret;
+		goto clean_cpuhp_states;
 
-	// ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "soc/exynos-pmu:online",
-	// 			exynos_cpuhp_pmu_online, exynos_cpuhp_pmu_offline);
-	// if (ret < 0)
-	// 	goto clean_cpuhp_states;
+	pmu_context->cpuhp_power_down = ret;
 
-	// pmu_context->cpuhp_online_state = ret;
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "soc/exynos-pmu:online",
+				exynos_cpuhp_pmu_online, exynos_cpuhp_pmu_offline);
+	if (ret < 0)
+		goto clean_cpuhp_states;
+
+	pmu_context->cpuhp_online_state = ret;
 
 	/* register CPU PM notifiers for cpuidle */
 	ret = cpu_pm_register_notifier(&exynos_cpu_pm_notifier);
@@ -581,6 +494,10 @@ static int setup_cpuhp_and_cpuidle(struct device *dev)
 clean_cpuhp_states:
 	if (pmu_context->cpuhp_prepare_state != CPUHP_INVALID)
 		cpuhp_remove_state(pmu_context->cpuhp_prepare_state);
+	if (pmu_context->cpuhp_power_up != CPUHP_INVALID)
+		cpuhp_remove_state(pmu_context->cpuhp_power_up);
+	if (pmu_context->cpuhp_power_down != CPUHP_INVALID)
+		cpuhp_remove_state(pmu_context->cpuhp_power_down);
 	if (pmu_context->cpuhp_online_state != CPUHP_INVALID)
 		cpuhp_remove_state(pmu_context->cpuhp_online_state);
 
