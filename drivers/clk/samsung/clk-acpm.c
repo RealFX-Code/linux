@@ -129,13 +129,9 @@ static unsigned long acpm_clk_recalc_rate(struct clk_hw *hw,
 					  unsigned long parent_rate)
 {
 	struct acpm_clk *clk = to_acpm_clk(hw);
-	unsigned long ret;
 
-	pr_err("%s clk->id=%u parent_rate=%lu\n", __func__, clk->id, parent_rate);
-
-	ret = clk->handle->ops->dvfs.get_rate(clk->handle, clk->mbox_chan_id,
+	return clk->handle->ops->dvfs.get_rate(clk->handle, clk->mbox_chan_id,
 					       clk->id);
-	return ret ?: 1000;
 }
 
 static int acpm_clk_determine_rate(struct clk_hw *hw,
@@ -147,8 +143,6 @@ static int acpm_clk_determine_rate(struct clk_hw *hw,
 	 * after the rate is set and we'll know what rate the clock is
 	 * running at then.
 	 */
-	struct acpm_clk *clk = to_acpm_clk(hw);
-	pr_err("%s clk->id=%u\n", __func__, clk->id);
 	return 0;
 }
 
@@ -156,8 +150,6 @@ static int acpm_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 			     unsigned long parent_rate)
 {
 	struct acpm_clk *clk = to_acpm_clk(hw);
-
-	pr_err("%s clk->id=%u rate=%lu parent_rate=%lu\n", __func__, clk->id, rate, parent_rate);
 
 	return clk->handle->ops->dvfs.set_rate(clk->handle, clk->mbox_chan_id,
 					       clk->id, rate);
