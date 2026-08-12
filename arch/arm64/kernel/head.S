@@ -168,6 +168,32 @@ SYM_CODE_END(record_mmu_state)
  * Preserve the arguments passed by the bootloader in x0 .. x3
  */
 SYM_CODE_START_LOCAL(preserve_boot_args)
+///* --- START APPENDED DTB PATCH --- */
+//	adr_l	x4, _edata		// Appended DTB sits right after the Image payload
+//	ldr	w5, [x4]			// Read first 4 bytes
+//	ldr	w6, =0xedfe0dd0		// Little-endian FDT magic (0xd00dfeed byte-swapped)
+//	cmp	w5, w6
+//	b.ne	1f				// If magic doesn't match, skip to normal boot
+//
+//	// DTB found! Read its total size from offset 4
+//	ldr	w7, [x4, #4]
+//	rev	w7, w7				// FDT is Big-Endian; byte-swap to CPU endian
+//
+//	// Calculate safe destination: end of BSS (_end), aligned to 8 bytes
+//	adr_l	x8, _end
+//	add	x8, x8, #7
+//	bic	x8, x8, #7
+//
+//	// Update x0 so the rest of the kernel uses our relocated DTB
+//	mov	x0, x8
+//
+//2:	// Relocation loop: copy DTB to avoid it being zeroed by .bss clearing
+//	ldp	x9, x10, [x4], #16
+//	stp	x9, x10, [x8], #16
+//	subs	w7, w7, #16
+//	b.gt	2b
+//
+//1:	/* --- END APPENDED DTB PATCH --- */
 	mov	x21, x0				// x21=FDT
 
 	adr_l	x0, boot_args			// record the contents of
