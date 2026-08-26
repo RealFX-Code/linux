@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Samsung Galaxy A21s (SM-A217F) (4GB) device tree source
+ *
+ * Copyright (c), 2026, Thomas Turner <tturner@lineageos.org>
+ */
+
+/dts-v1/;
+#include "exynos850-xcover5-common.dtsi"
+
+/ {
+        model = "Samsung Galaxy XCover 5 (G525F) (4GB)";
+        compatible = "samsung,armv8\0samsung,exynos3830", "samsung,g525f", "samsung,g525f-4gb", "samsung,exynos850";
+
+	memory@80000000 {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x3c900000>,
+		      <0x0 0xc0000000 0x20000000>,
+		      <0x0 0xe0d00000 0x1f300000>,
+		      <0x8 0x80000000 0x20000000>,
+		      <0x8 0xa0000000 0x20000000>,
+		      <0x8 0xc0000000 0x20000000>,
+		      <0x8 0xe0000000 0x20000000>;
+	};
+};
