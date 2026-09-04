@@ -13,13 +13,29 @@
 	};
 
 	chosen {
-		bootargs = "ignore_loglevel clk_ignore_unused nokaslr earlycon=exynos4210,0x14c20000 console=ttySAC0,115200 root=/dev/sda15 rw";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* Earlycon if you need it for any reason: */
+		/*  earlycon=exynos4210,0x14c20000  */
+		bootargs = "clk_ignore_unused nokaslr console=ttySAC0,115200 console=tty0 root=/dev/sda15 rw";
 		stdout-path = &serial_1;
+
+		framebuffer {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0xe2a00000 0x0 0xe10000>;
+			width = <1440>;
+			height = <2560>;
+			/* 1440*4 = 5760 = 0x1680 */
+			stride = <0x1680>;
+			format = "a8r8g8b8";
+		};
 	};
 
 	memory@40000000 {
 		device_type = "memory";
-		reg = <0x0 0x40000000 0x0 0xBE800000>;
+		reg = <0x0 0x40000000 0x0 0xbe800000>;
 	};
 
 	reserved-memory {
@@ -27,9 +43,15 @@
 		#size-cells = <2>;
 		ranges;
 
-		secure-firmware@FF980000 {
+		secure-firmware@ff980000 {
 			no-map;
-			reg = <0x0 0xFF980000 0x0 0x00680000>;
+			reg = <0x0 0xff980000 0x0 0x00680000>;
+		};
+
+		framebuffer@e2a00000 {
+			/* 1440*2560*4 = 14745600 = 0xe10000 */
+			reg = <0x0 0xe2a00000 0x0 0xe10000>;
+			no-map;
 		};
 	};
 
@@ -113,6 +135,7 @@
 
 		regulators {
 			compatible = "maxim,max77843-regulator";
+
 			safeout1_reg: SAFEOUT1 {
 				regulator-name = "SAFEOUT1";
 				regulator-min-microvolt = <3300000>;
@@ -151,7 +174,7 @@
 			compatible = "samsung,s2mps13-clk";
 			#clock-cells = <1>;
 			clock-output-names = "s2mps13_ap", "s2mps13_cp",
-				"s2mps13_bt";
+					     "s2mps13_bt";
 		};
 
 		regulators {
