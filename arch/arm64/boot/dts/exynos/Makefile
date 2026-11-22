@@ -17,6 +17,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += \
 	exynos8855-smdk.dtb		\
 	exynos8895-dreamlte.dtb		\
 	exynos9810-starlte.dtb		\
+	exynos9810-r7.dtb		\
 	exynos990-c1s.dtb		\
 	exynos990-r8s.dtb               \
 	exynos990-x1s.dtb		\
